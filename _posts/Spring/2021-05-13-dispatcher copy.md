@@ -56,6 +56,9 @@
     - application scope
 - Bean Lite Mode는 무엇인가요?
 - @Bean과 @Component은 각각 언제 사용되고 어떤 차이점을 가지나요?
+@Component는 Class Level에서, @Bean은 Method Level에서 적용된다. @Component는 Class와 Bean이 One to One 관계를 갖는 반면 메소드는 그렇지 않다.
+@Bean 은 Class에 @Component를 붙일 수 없는 외부라이브러리에 사용한다.
+
 - Interceptor와 Filter의 차이점을 말해주세요.
 필터와 인터셉터는 실행되는 시점에서 차이가 있습니다. 필터는 웹 애플리케이션에 등록을 하고, 인터셉터는 스프링의 context에 등록을 합니다. 따라서 컨트롤러에 들어가기 전 작업을 처리하기 위해 사용하는 공통점이 있지만, 호출되는 시점에서 차이가 존재합니다.
 필터는 디스패처서블릿 앞에서 처리하고 interceptor는 디스패처 서블릿에서 핸들러를 호출하기전에 동작한다.
