@@ -66,12 +66,28 @@
 - Message Converter 와 MV Container는 각각 어떻게 개입하고 어떤 방식으로 동작하나요?
 - VO, DTO, DAO에 대해서 각각 설명해 주세요.
 - Spring AOP는 어떻게 동작할까요? (프록시는 언제 생성되고 요청은 어떻게 잡아내나요?)
+    - 프록시는 스프링컨테이너가 빈을 생성 한 뒤 빈후처리기를 통해 프록시를 생성하고 기존에 생성 된 빈을 대체합니다. 그 후 요청이 올때 기존의 프록시에서 기존의 빈을 reflection이나 cglib 의 바이트 코드 조작을 통해 요청합니다.
 - MVC1, 2 개념에 대해서 설명해 주세요.
 - Dispatcher-Servlet이란 무엇인가요?
 - Spring MVC에서 HTTP 요청이 들어왔을 때의 흐름을 설명해 주세요.
     - DispatcherServlet에서 url을 기준으로 핸들러 매핑 클래스의 매핑정보를 조회하며 핸들러를 찾고 찾은 핸들러를 사용할 수 있는 핸들러 어댑터를 찾기 위해 핸들러 어댑터 매핑 클래스에서 매핑 정보를 조회하여 핸들러 어댑터를 찾습니다. 그 후에 핸들러 어댑터로 요청이 전달되고 핸들러 어댑터는 핸들러(컨트롤러)에게 요청을 전달합니다. 컨트롤러는 요청에 대한 결과값을 반환하고 핸들러 어댑터는 핸들러의 요청 결과인 MODEL AND VIEW를 디스패처서블릿에 반환합니다. 디스패처 서블릿은 위에서 받아온 논리 뷰이름을 뷰리졸버에게 전달합니다. 뷰 리졸버는 논리뷰이름을 통해 물리적인 뷰를 찾고 반환합니다. 그후 뷰객체를 통해 렌더링 됩니다.
 - Spring AOP는 CTW, LTW, RTW 중에 무엇이고 Aspactj 와 비교하여 언제 사용하는 것이 좋고 언제 사용하지 않는 것이 좋을까요?
+    - compile time weaving
+    - load time weaving
+    - runtime weaving
 - Dynamic Proxy의 CTW, BTW, LTW, RTW은 각각 무엇인가요?
 - @Transactional를 스프링 Bean 메서드 A에 적용하였고, 해당 Bean의 메서드 B가 호출되었을 때 메서드 내부에서 메서드 A를 호출하면 어떤 요청 흐름이 발생하게 되나요?
 - A라는 Service 객체의 메서드가 존재하고 내부에서 로컬 트랜잭션이 3개가 존재한다고 할 때, @Transactional을 A 메서드에 적용하였을 때 어떠한 일이 벌어지고, 어떤 요청 흐름이 발생하게 되나요?
 - Reflection API는 Runtime에서 코드를 생성해내는데 많이 사용되게 됩니다. 이는 스프링에서도 적용되는데요. 스프링 컨테이너는 이런 Reflection으로 생성된 Bean을 알고 있네요? 어떻게 알 수 있을까요?
+
+
+
+
+
+spring boot aop
+
+jdk dynamic proxy
+cglib
+
+기존의 스프링에서는 interface를 구현한 빈을 프록시 객체로 생성할때는 jdk dynamic proxy를 통해 프록시를 생성했다.
+하지만, 스프링부트에서는 cglib를 선택 특정 옵션을 주지 않으면 cglib로 모든 프록시를 생성한다.
