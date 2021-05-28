@@ -1,0 +1,158 @@
+---
+layout: post
+title:  "Spring Batch Jpa Test"
+date:   2021-05-24T10:02:52-05:00
+author: miz
+categories: SpringBatch
+---
+
+
+> https://jojoldu.tistory.com/455?category=902551
+> 이동욱 님의 스프링 배치 가이드를 보고 공부 중 정리한 내용입니다.
+
+# Spring Batch Jpa Test 방법
+1. 위의 동욱님의 Spring Batch 테스트를 따라 하던 도중 Jpa가 정상적으로 동작하지 않는 문제가 발생 해결 방법을 찾고 공유 드립니다.
+> 정확한 방법이 아닐 수도 있습니다. 혹시 더 좋은 방법을 아신다면 알려주세요!!!!!
+
+2. 예제 테스트 코드입니다. 간단한 기능을 사용하여 jpa 배치를 구성하였습니다.
+    - 배치에 대한 내용은 동욱님의 블로그를 참조 하세요!!
+```java
+@SpringBatchTest
+@SpringBootTest(classes = {TestBatchConfig.class, JpaItemWriterJobConfiguration.class})
+class JpaItemWriterJobConfigurationTest {
+
+    @Autowired
+    PayRepository payRepository;
+
+    @Autowired
+    Pay2Repository pay2Repository;
+
+    @Autowired
+    private JobLauncherTestUtils jobLauncherTestUtils;
+
+
+    @BeforeEach
+    void beforeEach() throws SQLException {
+
+    }
+    @AfterEach
+    public void tearDown() throws Exception {
+        payRepository.deleteAllInBatch();
+        pay2Repository.deleteAllInBatch();
+    }
+
+    @Test
+    void batchSampleTest() throws Exception {
+        //given
+        payRepository.save(new Pay(9000L, "test4", LocalDateTime.now()));
+        payRepository.save(new Pay(10000L, "test1", LocalDateTime.now()));
+        payRepository.save(new Pay(20000L, "test2", LocalDateTime.now()));
+        payRepository.save(new Pay(30000L, "test3", LocalDateTime.now()));
+
+
+        //when
+        JobExecution jobExecution = jobLauncherTestUtils.launchJob();
+
+
+        //then
+        ExitStatus exitStatus = jobExecution.getExitStatus();
+        assertThat(exitStatus.getExitCode()).isEqualTo(COMPLETED.toString());
+
+        List<Pay2> findList = pay2Repository.findAll();
+        assertThat(findList.size()).isEqualTo(3);
+        assertThat(findList.get(0).getAmount()).isEqualTo(10100L);
+        assertThat(findList.get(1).getAmount()).isEqualTo(20100L);
+        assertThat(findList.get(2).getAmount()).isEqualTo(30100L);
+
+    }
+
+
+}
+```
+
+- JpaItemWriterJobConfiguration 코드입니다.
+- Pay의 내용을 불러와 amount에 + 100 을해서 Pay2에 저장하는 간단한 배치입니다.
+```java
+@Slf4j
+@RequiredArgsConstructor
+@Configuration
+public class JpaItemWriterJobConfiguration {
+
+    private final JobBuilderFactory jobBuilderFactory;
+    private final StepBuilderFactory stepBuilderFactory;
+    private final EntityManagerFactory entityManagerFactory;
+
+    private static final int chunkSize = 10;
+
+    @Bean
+    public Job jpaItemWriterJob() {
+        return jobBuilderFactory.get("jpaItemWriterJob")
+                .start(jpaItemWriterStep())
+                .build();
+    }
+
+    @Bean
+    public Step jpaItemWriterStep() {
+        return stepBuilderFactory.get("jpaItemWriterStep")
+                .<Pay, Pay2>chunk(chunkSize)
+                .reader(jpaItemWriterReader())
+                .processor(jpaItemProcessor())
+                .writer(jpaItemWriter())
+                .build();
+    }
+
+    @Bean
+    public JpaPagingItemReader<Pay> jpaItemWriterReader() {
+        return new JpaPagingItemReaderBuilder<Pay>()
+                .name("jpaItemWriterReader")
+                .entityManagerFactory(entityManagerFactory)
+                .pageSize(chunkSize)
+                .queryString("SELECT p FROM Pay p where amount > 9000")
+                .build();
+    }
+
+    @Bean
+    public ItemProcessor<Pay, Pay2> jpaItemProcessor() {
+        return pay -> new Pay2(pay.getAmount()+100, pay.getTxName(), pay.getTxDateTime());
+    }
+
+    @Bean
+    public JpaItemWriter<Pay2> jpaItemWriter() {
+        JpaItemWriter<Pay2> jpaItemWriter = new JpaItemWriter<>();
+        jpaItemWriter.setEntityManagerFactory(entityManagerFactory);
+        return jpaItemWriter;
+    }
+}
+```
+
+- TestBatchConfig.class입니다.
+```java
+@Configuration
+@EnableAutoConfiguration
+@EnableBatchProcessing
+@EntityScan("com.miz.batch.model")
+@EnableJpaRepositories("com.miz.batch.repository")
+@EnableTransactionManagement
+public class TestBatchConfig {
+
+    /**
+     * @EntityScan("com.miz.batch.model")
+     * @EnableJpaRepositories("com.miz.batch.repository")
+     * @EnableTransactionManagement
+     * 위의 어노테이션을 추가해줌으로써 jpa 설정을 추가해준다
+     * 테스트코드에서 정상 동작한다.
+     */
+}
+```
+## 위의 3가지 추가된 어노테이션이 핵심입니다.
+- SpringBootTest에 class를 표기하면서, Jpa 관련 빈들이 올라오지 않아 문제가 되었습니다.
+- 혹시 에러로그 검색을 통해 들어오실 분들을 위해 에러로그도 공유 합니다.
+1. org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'com.miz.batch.job.JpaItemWriterJobConfigurationTest': Unsatisfied dependency expressed through field 'payRepository'; nested exception is org.springframework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type 'com.miz.batch.repository.PayRepository' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {@org.springframework.beans.factory.annotation.Autowired(required=true)}
+	at org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor$AutowiredFieldElement.resolveFieldValue(AutowiredAnnotationBeanPostProcessor.java:660) ~[spring-beans-5.3.6.jar:5.3.6]
+2. java.lang.IllegalArgumentException: org.hibernate.hql.internal.ast.QuerySyntaxException: Pay is not mapped
+
+## 결론
+- @SpringBootTest에서 Classes를 기입하면서 적은 class들의 관련된 세팅만 빈으로 올리게되면서 에러가 발생한다.
+- Jpa관련 세팅을 추가해주자
+- 혹시 Profile 별로 디비 설정을 다르게 가져가신 분은 @ActiveProfiles 어노테이션을 사용해주세요.
+- 제가 테스트한 환경은 Spring Boot 2.4.5 버전입니다. 2버전대 이후에서만 @SpringBatchTest가 동작합니다. 
