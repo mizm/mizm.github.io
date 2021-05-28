@@ -98,7 +98,8 @@ cglib
 
 자바 gc 동작방법
 
-자바 jvm xms?
+자바 jvm xms xmx
+    - 자바 힙의 사이즈를 지정하는 jvm 옵션이다.
     - 힙사이즈의 최소와 최대를 다르게 주었을때 최소에 힙사이즈가 도달하면 gc + 힙사이즈 증가하는 동안 stw 가 발생한다.
     - 그래서 동일하게 주는게 좋다
 자바 추상클래스 인터페이스
@@ -109,7 +110,7 @@ cglib
     - 인터페이스는 구현은 상관없고 어떤 행동을 해야하는지에 대한 설명서이다.
     - 서로 관련성이 없는 클래스들이 비슷한 행동을 사용하는 경우
     - 자바 1.8부터는 default 메서드를 통해 구현코드가 가능하다.
-자바 인터페이스 왜씀
+
 자바 oom 해결방법
 자바 풀gc
     - Old generation이 꽉 차면 
@@ -117,27 +118,74 @@ cglib
 디비 조인
 디비 인덱스
     - 인덱스는 where 조건을 기준으로 탄다
+    - 인덱스 생성 순서가 중요한데 이때 가장 중복이 낮은 순서대로 인덱스를 만드는 것이 좋다
+    - a, b 필드의 인덱스가 걸려있고 b를 search할때는 인덱스의 효과를 볼 수 없다 하지만 a는 볼 수 있다
+        - 인덱스는 걸린 순서대로 찾기떄문에
+    - GROUP BY 절에 명시된 컬럼이 인덱스 컬럼의 순서와 같아야 한다.
+        - 아래 모든 케이스는 인덱스가 적용 안된다. (index: a,b,c)
+        - group by b
+        - group by b, a
+        - group by a, c, b
+    - 인덱스 컬럼 중 뒤에 있는 컬럼이 GROUP BY 절에 명시되지 않아도 인덱스는 사용할 수 있다.
+        - 아래 모든 케이스는 인덱스가 적용된다. (index: a,b,c)
+        - group by a
+        - group by a, b
+        - group by a, b, c
+    - 반대로 인덱스 컬럼 중 앞에 있는 컬럼이 GROUP BY 절에 명시되지 않으면 인덱스를 사용할 수 없다
+        - ex: (index: a,b,c), group by b, c 는 인덱스 적용안됨
+    - 인덱스에 없는 컬럼이 GROUP BY 절에 포함되어 있으면 인덱스가 적용되지 않는다.
+        - ex: (index: a,b,c), group by a,b,c,d 는 인덱스 적용안됨
 디비 그룹인덱스??
 커버링인덱스
+    - 실행계획 extra 필드에 Using Index가 표기됨
+    - 쿼리의 모든 항목이 인덱스 컬럼으로 이루어진 상태
+    - 인덱스가 있더라도 select에 추가적인 컬럼을 찾아오기 위해서는 데이터 블록에 대한 접근이 필요한데 추가적인 컬럼 없이 인덱스만으로 쿼리를 완성하는 것
+    - 아래 쿼리는 customer_id가 인덱스 이지만 select 절의 다른 필드들을 찾아오기 위해서 데이터 블록에 접근을 해야한다.
+```sql
+    select *
+    from temp_ad_offset
+    where customer_id = 7;
+```
+    - 아래 쿼리는 인덱스만 가져오기 떄문에 데이터 블록에 접근할 필요가 없다
+```sql
+    select customer_id
+    from temp_ad_offset
+    where customer_id = 7;
+```
+    -  Extra 항목에 Using index가 나오면 커버링 인덱스가 사용 된 것이다.
 디비 where 절 서브쿼리
+    - 서브쿼리는 임시 테이블 생성해서 데이터를 넣게 되니까 기존 인덱스가 쓸모없다.
 디비 실행계획
-    - 트리구조 생성 후위순회한다
 디비 락
+
+- 격리성 수준에 따른 발생하는 문제점
+- dirty read
+    - 트랜잰셩에 의해 수정되었지만 커밋되지 않은 내용을 기준으로 읽어온다.
+- Non-Repeatable Read
+    - 같은 키를 가진 row를 두번 읽을때 그 사이에 값이 변경되거나 삭제되어 결과가 다르게 나온다
+- Panthom Read
+    - 다건요청에서 두번 읽을때 처음에는 없던 레코드가 생성된다.
+
+- 격리성 수준
+- Read Uncommited
+    - commit되지않은 다른 트랜잭션의 내용을 읽는 것을 허용한다.
+    - dirty read, Non-Repeatable Read, Phantom Read가 발생한다
+- Read Commited
+    - commit이 되어 확정된 데이터만 읽도록 허용한다.
+    - 커밋 되지 않은 데이터에 대해서는 실제 DB 데이터가 아닌 undo 로그에 있는 이전 데이터를 가지고 온다.
+    - Non-Repeatable REad, Phantom Read가 발생한다.
+- Repeatable Read
+    - 트랜잭션내에서 삭제 변경에 대해서 Undo 로그에 남긴다
+    - 앞서 발생한 트랜잭션에 대해서는 실제 데이터 대신에 Undo로그에 있는 백업데이터를 읽게 한다.
+    - Phantom Read가 발생한다.
+
+팬텀 리드
+- MySQL에서는 REPEATABLE READ 와 READ COMMITTED level에 대해서 한 트랜잭션에서 SELECT 쿼리로 데이터를 읽어올 때 테이블에 lock을 걸지 않고, 해당 시점의 데이터 상태를 의미하는 snapshot 를 구축하여 거기서 데이터를 읽어온다.
+- Repeatable Read는 한 트랜잭션에서 한 snapshot 만을 사용해 phantom read를 사용하지 않는다.
+    - 하지만 update, delete 같은 경우는 출력 될수 있다.
+- , READ COMMITTED 에서 각각의 SELECT 쿼리는 그때그때 최신의 snapshot을 구축하여 데이터를 읽어온다. 따라서 한 트랜잭션이지만 SELECT 쿼리의 결과가 다르기도 했다.
+https://jupiny.com/2018/11/30/mysql-transaction-isolation-levels/
 디비 조인
-팬텀리드
-딥 쿼리힌트
-
-@autoconfiguration
-스프링배치 그룹스크립트
-rest api란
-문서화
-컴포넌트스캔 다른 스캔
-엔진엑스 리버스프록시
-무중단배포
-msa
-
-레디스 컬렉션
-레디스 failover
 
 sql 실행순서
 from() where() groupby() having() select() orderby()
