@@ -37,7 +37,7 @@
     - 사용
     - 소멸전 콜백 @PreDestroy
     - 스프링 종료
-- 순환 참조는 무엇이고 어떻게 발생하나요?
+- 순환 참조는 무엇이고 어떻게 발생하나요?ㅋㅏ
     - A 객체가 B 객체를 의존해서 호출하고 B 객체에서도 A 객체를 호출할때 내부적으로 순환하면서 스택이 쌓이다가 오류가 난다.
     - 서로 다른 객체가 서로 의존관계에 있을때 발생합니다.
     - 의존관계를 생성자로 주입하게 되면 
@@ -83,8 +83,11 @@
 
 Spring Framework에서도 Reflection API를 사용하는데 대표적으로 Spring Container의 BeanFactory가 있다. Bean은 애플리케이션이 실행한 후 런타임에 객체가 호출될 때 동적으로 객체의 인스턴스를 생성하는데 이때 Spring Container의 BeanFactory에서 리플렉션을 사용한다.
 
-
-
+- Spring AutoConfiguration
+    - Spring Boot가 spring.factories 파일에 사전에 정의한 AutoConfiguration 내용에 의해 bean 생성이 진행됩니다.
+    - 우리가 설정한 bean이 먼저 생성되고 해당 AutoConfiguration은 필터링 되어 중복생성되는 상황을 막습니다. 우리가 해당 bean을 설정하지 않았다면 AutoConfiguration에서는 해당 bean을 자동 생성하게 됩니다.
+    - 특정 bean들의 존재유무에 대해서 다루는 필터입니다. @ConditionalOnBean, @ConditionalOnMissingBean, @ConditionalOnSingleCandidate
+    - 특정 class들의 존재유무에 대해서 다루는 필터입니다. @ConditionalOnClass, @ConditionalOnMissingClass
 
 spring boot aop
  
@@ -189,3 +192,7 @@ https://jupiny.com/2018/11/30/mysql-transaction-isolation-levels/
 
 sql 실행순서
 from() where() groupby() having() select() orderby()
+
+
+redis failover
+- master node가 죽을 경우 cluster failover takeover 명령어를 통해 slave를 master로 승격시킨다.
